@@ -3,15 +3,16 @@ import random
 import matplotlib.pyplot as plt
 import networkx as nx
 
+# preferential attachment model
 G = nx.barabasi_albert_graph(10000, 3)
 
+# # configuration model
 # z=[int(random.gammavariate(alpha=9.0,beta=2.0)) for i in range(10000)]
 # G=nx.configuration_model(z)
 
 
-
 alpha = 0.2 # infection probability
-steps = 10
+steps = 10 # steps for SIR process
 
 def avg(l):
     return sum(l) / len(l)
@@ -21,6 +22,7 @@ def calc_sir_network_model(G: nx.Graph):
     S = set()
     R = set()
 
+    # select initial infected nodes
     for node in G.nodes:
         if random.random() <= alpha:
             I.add(node)
@@ -34,15 +36,18 @@ def calc_sir_network_model(G: nx.Graph):
         _I = set()
         _Ir = set()
         for node in I:
+
+            # infect new neighbors from suspectible set S
             for neighbor in G.neighbors(node):
                 if random.random() <= alpha and neighbor in S:
                     S.remove(neighbor)
                     _I.add(neighbor)
 
             _Ir.add(node)
-        
+    
         I.update(_I)
 
+        # infected nodes are now recovered and moved to set R
         for node in _Ir:
             I.remove(node)
             R.add(node)
@@ -71,12 +76,13 @@ def calc_sir_network_local(G: nx.Graph, k, q):
     St = [[] for _ in range(steps + 1)]
     Rt = [[] for _ in range(steps + 1)]
 
-
+    # run SIR process q times
     for _ in range(q):
         I = set()
         S = set()
         R = set()
 
+        # select initial infected nodes
         for node in _G.nodes:
             if random.random() <= alpha:
                 I.add(node)
@@ -91,6 +97,8 @@ def calc_sir_network_local(G: nx.Graph, k, q):
             _I = set()
             _Ir = set()
             for node in I:
+
+                # infect new neighbors from suspectible set S
                 for neighbor in _G.neighbors(node):
                     if random.random() <= alpha and neighbor in S:
                         S.remove(neighbor)
@@ -100,6 +108,7 @@ def calc_sir_network_local(G: nx.Graph, k, q):
             
             I.update(_I)
 
+            # infected nodes are now recovered and moved to set R
             for node in _Ir:
                 I.remove(node)
                 R.add(node)
@@ -108,6 +117,7 @@ def calc_sir_network_local(G: nx.Graph, k, q):
             St[t].append(len(S))
             Rt[t].append(len(R))
 
+    # calculate average values from q runs
     lg = len(_G.nodes)
     It = [avg(l) / lg for l in It]
     St = [avg(l) / lg for l in St]
@@ -119,10 +129,8 @@ def calc_sir_network_local(G: nx.Graph, k, q):
                 
 
 if __name__ == '__main__':
-    #G = nx.random_regular_graph(4, 10000)
     It1, St1, Rt1, n1 = calc_sir_network_model(G)
 
-    #G = nx.random_regular_graph(4, 100)
     It2, St2, Rt2, n2 = calc_sir_network_local(G, 4, 20)
 
     fig, axs= plt.subplots(2)
