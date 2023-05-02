@@ -32,7 +32,7 @@ def plot_disease_spread(ax: plt.Axes, title: str,
                         proportions: Dict[Compartment, List[float]]) -> None:
     ax.set_title(title)
     ax.xaxis.set_label_text("time [steps]")
-    ax.yaxis.set_label_text("proportion of population [%]")
+    ax.yaxis.set_label_text("population percentage [%]")
 
     num_steps = len(next(iter(proportions.values())))
     ax.stackplot(range(num_steps),
@@ -317,19 +317,6 @@ def plot_sir(graph, k, q):
 
     fig, axs = plt.subplots(2)
     fig.tight_layout(pad=3)
-
-    # axs[0].title.set_text(f"Full graph n: {n1}")
-    # axs[0].plot(It1, label="I")
-    # axs[0].plot(St1, label="S")
-    # axs[0].plot(Rt1, label="R")
-
-    # axs[1].title.set_text(f"Local graph n: {n2}")
-    # axs[1].plot(It2, label="I")
-    # axs[1].plot(St2, label="S")
-    # axs[1].plot(Rt2, label="R")
-
-    # axs[0].legend()
-    # axs[1].legend()
 
     plot_disease_spread(
         axs[0], title=f"Full graph n: {n1}",
