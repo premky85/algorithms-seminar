@@ -1,13 +1,58 @@
 import random
-
 import matplotlib.pyplot as plt
 import networkx as nx
+from tqdm import tqdm
+from enum import Enum, auto
+from typing import *
+
+
+class Compartment(Enum):
+    """for compartmental modelling of epidemics"""
+    SUSCEPTIBLE = auto()
+    INFECTED = auto()
+    REMOVED = auto()
+    EXPOSED = auto()
+
+    @property
+    def plot_color(self) -> str:
+        match self.name:
+            case "SUSCEPTIBLE": return "blue"
+            case "INFECTED": return "red"
+            case "REMOVED": return "gray"
+            case "EXPOSED": return "yellow"
+
+    @property
+    def plot_label(self) -> str:
+        match self.name:
+            case "REMOVED": return "recovered / removed"
+            case other: return other.lower()
+
+
+def plot_disease_spread(ax: plt.Axes, title: str,
+                        proportions: Dict[Compartment, List[float]]) -> None:
+    ax.set_title(title)
+    ax.xaxis.set_label_text("time [steps]")
+    ax.yaxis.set_label_text("population percentage [%]")
+
+    num_steps = len(next(iter(proportions.values())))
+    ax.stackplot(range(num_steps),
+                 *([100 * p for p in props]
+                   for props in proportions.values()),
+                 labels=[comp.plot_label for comp in proportions.keys()],
+                 colors=[comp.plot_color for comp in proportions.keys()])
+
+    ax.set_label("compartments")
+    ax.legend()
+
 
 n = 10000
 
 
-alpha = 0.2  # infection probability
-steps = 10  # steps for SIR process
+alpha = 0.2
+"""infection probability"""
+
+steps = 10
+"""steps for SIR process"""
 
 
 def avg(l):
@@ -34,7 +79,7 @@ def calc_sir_network_model(G: nx.Graph):
         _Ir = set()
         for node in I:
 
-            # infect new neighbors from suspectible set S
+            # infect new neighbors from susceptible set S
             for neighbor in G.neighbors(node):
                 if random.random() <= alpha and neighbor in S:
                     S.remove(neighbor)
@@ -125,7 +170,7 @@ def calc_sir_network_local_multiple(G: nx.Graph, k, q):
     Rt = [[] for _ in range(steps + 1)]
 
     # run SIR process q times
-    for _ in range(q):
+    for _ in tqdm(range(q), desc=f"SIR simulation on multiple {k}-neighborhoods"):
         node = random.choice(list(G.nodes))
         _G = nx.ego_graph(G, node, k)
 
@@ -256,7 +301,8 @@ def plot_sir(graph, k, q):
         G = None
         while not G:
             try:
-                z = [int(random.gammavariate(alpha=9.0, beta=1)) for i in range(n)]
+                z = [int(random.gammavariate(alpha=9.0, beta=1))
+                     for i in range(n)]
                 G = nx.configuration_model(z)
             except Exception:
                 continue
@@ -272,18 +318,22 @@ def plot_sir(graph, k, q):
     fig, axs = plt.subplots(2)
     fig.tight_layout(pad=3)
 
-    axs[0].title.set_text(f"Full graph n: {n1}")
-    axs[0].plot(It1, label="I")
-    axs[0].plot(St1, label="S")
-    axs[0].plot(Rt1, label="R")
+    plot_disease_spread(
+        axs[0], title=f"Full graph n: {n1}",
+        proportions={
+            Compartment.INFECTED: It1,
+            Compartment.SUSCEPTIBLE: St1,
+            Compartment.REMOVED: Rt1,
+        })
 
-    axs[1].title.set_text(f"Local graph n: {n2}")
-    axs[1].plot(It2, label="I")
-    axs[1].plot(St2, label="S")
-    axs[1].plot(Rt2, label="R")
+    plot_disease_spread(
+        axs[1], title=f"Local graph n: {n2}",
+        proportions={
+            Compartment.INFECTED: It2,
+            Compartment.SUSCEPTIBLE: St2,
+            Compartment.REMOVED: Rt2,
+        })
 
-    axs[0].legend()
-    axs[1].legend()
     plt.show()
 
 
@@ -333,4 +383,4 @@ def plot_outbreak_probability(graph, q):
 
 if __name__ == "__main__":
     plot_sir("configuration_model", 5, 20)
-    plot_outbreak_probability("haggle", 20)
+    # plot_outbreak_probability("haggle", 20)
