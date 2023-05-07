@@ -16,9 +16,9 @@ class Compartment(Enum):
     @property
     def plot_color(self) -> str:
         match self.name:
-            case "SUSCEPTIBLE": return "blue"
-            case "INFECTED": return "red"
-            case "REMOVED": return "gray"
+            case "SUSCEPTIBLE": return "#07a0d8"
+            case "INFECTED": return "#f77811"
+            case "REMOVED": return "#918989"
             case "EXPOSED": return "yellow"
 
     @property
@@ -165,29 +165,32 @@ def calc_sir_network_local(G: nx.Graph, k, q):
 
 
 def calc_sir_network_local_multiple(G: nx.Graph, k, q):
-    It = [[] for _ in range(steps + 1)]
-    St = [[] for _ in range(steps + 1)]
-    Rt = [[] for _ in range(steps + 1)]
+    # compartment size counters for each timestep, across ALL graphs
+    # (later divided by sum of graph sizes)
+    # NOTE: this is biased toward larger subgraphs?
+
+    It, St, Rt = (np.zeros(steps + 1) for _ in range(3))
+    total_subgraph_sz = 0
 
     # run SIR process q times
     for _ in tqdm(range(q), desc=f"SIR simulation on multiple {k}-neighborhoods"):
         node = random.choice(list(G.nodes))
-        _G = nx.ego_graph(G, node, k)
+        local_G = nx.ego_graph(G, node, k)
+        total_subgraph_sz += len(local_G)
 
         I = set()
         S = set()
         R = set()
 
         # select initial infected nodes
-        for node in _G.nodes:
+        for node in local_G.nodes:
             if random.random() <= alpha:
                 I.add(node)
             else:
                 S.add(node)
 
-        It[0].append(len(I))
-        St[0].append(len(S))
-        Rt[0].append(0)
+        It[0] += len(I)
+        St[0] += len(S)
 
         for t in range(1, steps + 1):
             _I = set()
@@ -195,7 +198,7 @@ def calc_sir_network_local_multiple(G: nx.Graph, k, q):
             for node in I:
 
                 # infect new neighbors from suspectible set S
-                for neighbor in _G.neighbors(node):
+                for neighbor in local_G.neighbors(node):
                     if random.random() <= alpha and neighbor in S:
                         S.remove(neighbor)
                         _I.add(neighbor)
@@ -209,17 +212,17 @@ def calc_sir_network_local_multiple(G: nx.Graph, k, q):
                 I.remove(node)
                 R.add(node)
 
-            It[t].append(len(I))
-            St[t].append(len(S))
-            Rt[t].append(len(R))
+            It[t] += len(I)
+            St[t] += len(S)
+            Rt[t] += len(R)
 
     # calculate average values from q runs
-    lg = len(_G.nodes)
-    It = [avg(l) / lg for l in It]
-    St = [avg(l) / lg for l in St]
-    Rt = [avg(l) / lg for l in Rt]
+    It /= total_subgraph_sz
+    St /= total_subgraph_sz
+    Rt /= total_subgraph_sz
+    mean_sz = total_subgraph_sz / q
 
-    return It, St, Rt, lg
+    return It, St, Rt, mean_sz
 
 
 def calc_local_outbreak_probability(G: nx.Graph, k, q):
@@ -304,7 +307,7 @@ def plot_sir(graph: nx.Graph, k: int, q: int, degree=2, multi_neighborhood=False
         while not G:
             try:
                 z = [int(random.gammavariate(alpha=9.0, beta=1))
-                     for i in range(n)]
+                     for _ in range(n)]
                 G = nx.configuration_model(z)
             except Exception:
                 continue
@@ -331,7 +334,7 @@ def plot_sir(graph: nx.Graph, k: int, q: int, degree=2, multi_neighborhood=False
             Compartment.REMOVED: Rt1,
         })
 
-    local_title = r"Local graphs: $\bar{n} = {}$".format(n2) if multi_neighborhood \
+    local_title = r"Local graphs: $\bar{{n}} = {}$".format(round(n2)) if multi_neighborhood \
                   else f"Local graph $n = {n2}$"
 
     plot_disease_spread(
@@ -392,10 +395,32 @@ def plot_outbreak_probability(graph, q):
     plt.show()
 
 
-if __name__ == "__main__":
-    alpha = 0.2
+def generate_SIR_plots(k=4):
+    global alpha
 
-    plot_sir("preferential_attachment", k=4, q=20, degree=2, multi_neighborhood=False)
-    # plot_sir("configuration_model", 5, 20)
-    
+    # fig. 8, 9
+    for alpha_i in [.2, .4]:
+        alpha = alpha_i
+
+        for deg in [2,3,4]:
+            plot_sir("preferential_attachment", k=k, q=20, degree=deg,
+                    multi_neighborhood=False, save_as=f"PA_alfa={alpha_i}_deg={deg}")
+            
+    # fig. 10
+    for alpha_i in [.2, .3, .4]:
+        alpha = alpha_i
+
+        plot_sir("configuration_model", k=k, q=20,
+                 multi_neighborhood=False, save_as=f"CM_sigle_alfa={alpha_i}")
+        
+    # fig. 11
+    for alpha_i in [.2, .3, .4]:
+        alpha = alpha_i
+
+        plot_sir("configuration_model", k=k, q=20,
+                 multi_neighborhood=True, save_as=f"CM_multi_alfa={alpha_i}")
+
+
+if __name__ == "__main__":
+    generate_SIR_plots()
     # plot_outbreak_probability("haggle", 20)
