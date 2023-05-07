@@ -4,7 +4,7 @@ import networkx as nx
 from tqdm import tqdm
 from enum import Enum, auto
 from typing import *
-
+import numpy as np
 
 class Compartment(Enum):
     """for compartmental modelling of epidemics"""
@@ -293,9 +293,11 @@ def calc_outbreak_probability(G: nx.Graph, k, q):
     return avg(outbreaks)
 
 
-def plot_sir(graph, k, q):
+def plot_sir(graph: nx.Graph, k: int, q: int, degree=2, multi_neighborhood=False, save_as: str = None):
+    if k > steps:
+        print(f"WARNING: infection process can't even reach {k}-neighbors in {steps} steps??")
+
     if graph == "preferential_attachment":
-        degree = 2
         G = nx.barabasi_albert_graph(n, degree)
     elif graph == "configuration_model":
         G = None
@@ -313,28 +315,37 @@ def plot_sir(graph, k, q):
 
     It1, St1, Rt1, n1 = calc_sir_network_model(G)
 
-    It2, St2, Rt2, n2 = calc_sir_network_local_multiple(G, k, q)
+    if multi_neighborhood:
+        It2, St2, Rt2, n2 = calc_sir_network_local_multiple(G, k, q)
+    else:
+        It2, St2, Rt2, n2 = calc_sir_network_local(G, k, q)
 
     fig, axs = plt.subplots(2)
     fig.tight_layout(pad=3)
 
     plot_disease_spread(
-        axs[0], title=f"Full graph n: {n1}",
+        axs[0], title=f"Full graph: $n = {n1}$",
         proportions={
             Compartment.INFECTED: It1,
             Compartment.SUSCEPTIBLE: St1,
             Compartment.REMOVED: Rt1,
         })
 
+    local_title = r"Local graphs: $\bar{n} = {}$".format(n2) if multi_neighborhood \
+                  else f"Local graph $n = {n2}$"
+
     plot_disease_spread(
-        axs[1], title=f"Local graph n: {n2}",
+        axs[1], title=local_title,
         proportions={
             Compartment.INFECTED: It2,
             Compartment.SUSCEPTIBLE: St2,
             Compartment.REMOVED: Rt2,
         })
 
-    plt.show()
+    if save_as is None:
+        plt.show()
+    else:
+        plt.savefig(f"plots/{save_as}.pdf")
 
 
 def plot_outbreak_probability(graph, q):
@@ -382,5 +393,9 @@ def plot_outbreak_probability(graph, q):
 
 
 if __name__ == "__main__":
-    plot_sir("configuration_model", 5, 20)
+    alpha = 0.2
+
+    plot_sir("preferential_attachment", k=4, q=20, degree=2, multi_neighborhood=False)
+    # plot_sir("configuration_model", 5, 20)
+    
     # plot_outbreak_probability("haggle", 20)
